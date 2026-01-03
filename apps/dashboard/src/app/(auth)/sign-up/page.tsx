@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { loadUser } = useAuth();
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +20,12 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Clear any existing tokens when the sign-up page loads
+  useEffect(() => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+  }, []);
 
   const handleRoleSelection = (selectedRole: "brand" | "influencer") => {
     setRole(selectedRole);
@@ -47,12 +53,12 @@ export default function SignUpPage() {
         role: apiRole,
       });
 
-      // Store tokens in localStorage
+      // Store only tokens in localStorage
       localStorage.setItem("accessToken", response.accessToken);
       localStorage.setItem("refreshToken", response.refreshToken);
 
-      // Store user in context
-      setUser(response.user);
+      // Load user data into context
+      await loadUser();
 
       // Redirect to dashboard
       router.push("/dashboard");

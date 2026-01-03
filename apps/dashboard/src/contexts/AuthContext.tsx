@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/lib/api";
 
 interface User {
   id: string;
@@ -22,6 +23,7 @@ interface AuthContextType {
   user: User | null;
   setUser: (user: User | null) => void;
   logout: () => void;
+  loadUser: () => Promise<void>;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
 }
@@ -34,31 +36,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    // Check if user is authenticated on mount
+  const loadUser = async () => {
     const accessToken = localStorage.getItem("accessToken");
-    const storedUser = localStorage.getItem("user");
 
-    setIsAuthenticated(!!accessToken);
-
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem("user");
-      }
+    if (!accessToken) {
+      setIsAuthenticated(false);
+      setIsAuthLoading(false);
+      return;
     }
 
-    setIsAuthLoading(false);
+    setIsAuthenticated(true);
+
+    try {
+      // Fetch user data from API
+      const userData = await getCurrentUser();
+      setUser(userData);
+    } catch (error) {
+      // If token is invalid, clear it and mark as unauthenticated
+      console.error("Failed to fetch user:", error);
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      setIsAuthenticated(false);
+      setUser(null);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUser();
   }, []);
 
   const setUserAndPersist = (nextUser: User | null) => {
     setUser(nextUser);
     if (nextUser) {
-      localStorage.setItem("user", JSON.stringify(nextUser));
       setIsAuthenticated(true);
-    } else {
-      localStorage.removeItem("user");
     }
   };
 
@@ -67,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(false);
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
     router.push("/sign-in");
   };
 
@@ -77,6 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         setUser: setUserAndPersist,
         logout,
+        loadUser,
         isAuthenticated,
         isAuthLoading,
       }}
